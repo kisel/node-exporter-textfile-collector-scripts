@@ -49,6 +49,11 @@ def get_btrfs_errors(mountpoint):
             raise RuntimeError("unexpected output from btrfs: '%s'" % line)
         yield m.group(1), m.group(2), int(m.group(3))
 
+def get_all_btrfs_block_devices():
+    blockdev = []
+    for p in glob.glob("/sys/fs/btrfs/*/devices/*"):
+        blockdev.append(os.path.join('/dev/', os.path.basename(p)))
+    return blockdev
 
 def btrfs_error_metrics():
     """Collect btrfs error metrics.
@@ -61,11 +66,12 @@ def btrfs_error_metrics():
         "# TYPE %s counter" % metric,
         "# HELP %s number of btrfs errors" % metric,
     ]
-    for mountpoint in get_btrfs_mount_points():
-        for device, error_type, error_count in get_btrfs_errors(mountpoint):
+
+    for blkdev in get_all_btrfs_block_devices():
+        for device, error_type, error_count in get_btrfs_errors(blkdev):
             contents.append(
-                '%s{mountpoint="%s",device="%s",type="%s"} %d' %
-                (metric, mountpoint, device, error_type, error_count))
+                '%s{device="%s",type="%s"} %d' %
+                (metric, device, error_type, error_count))
 
     if len(contents) > 2:
         # return metrics if there are actual btrfs filesystems found
